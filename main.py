@@ -5,7 +5,7 @@ from config import *
 import vk_api
 from vk_api.longpoll import VkLongPoll, VkEventType
 
-info = """Чат бот Vkinder. Данный бот подбирает аккауты по заданным условиям и выдает ссылку и 3 самых популярных фотографии подобранного аккаунта. 
+info = """ат бот Vkinder. Данный бот подбирает аккауты автоматически или по заданным условиям и выдает ссылку и 3 самых популярных фотографии подобранного аккаунта. 
 Аккаунты подбираются с возрастом от 14 лет. Семейное положение: в активном поиске.  Аккаунты открытые с наличием фото и online в момент поиска.
 
 Команды:
@@ -23,8 +23,13 @@ def param_mode(param_event, param):
     if None in param:
         return
     id_list = bot.get_id(param)
+    profiles = exception_bd(param_event.user_id)
+    for i in reversed(id_list):
+        for j in profiles:
+            if i in j:
+                id_list.remove(i)
     if not id_list:
-        bot.write_msg(param_event.user_id, 'Анкеты не найдены')
+        bot.write_msg(param_event.user_id, 'Анкеты не найдены или все просмотрены')
         return
     bot.send_profile(param_event.user_id, id_list[count])
     result_bd(param_event.user_id, id_list[count])
@@ -37,7 +42,8 @@ def param_mode(param_event, param):
                 result_bd(event_next.user_id, id_list[count])
                 count += 1
                 if count == len(id_list):
-                    count = 0
+                    bot.write_msg(event_next.user_id, 'Все анкеты просмотрены')
+                    break
             elif event_next.text.lower() == '/exit' or event_next.text.lower() == '/start':
                 break
 
@@ -66,6 +72,15 @@ def result_bd(id_user, id_profile):
     with connection.cursor() as cursor:
         cursor.execute(f"INSERT INTO result (id_user, id_profile) VALUES ({id_user}, {id_profile});")
     connection.close()
+
+
+def exception_bd(id_user):
+    connection = psycopg2.connect(host=host, user=user, password=password, database=db_name, port=port)
+    with connection.cursor() as cursor:
+        cursor.execute(f"SELECT id_profile from result where id_user = {id_user};")
+        profiles = cursor.fetchall()
+    connection.close()
+    return profiles
 
 
 for event in longpoll.listen():
